@@ -4,4 +4,4 @@ author: JNNGL
 version: '${version}'
 website: https://github.com/JNNGL/VanillaMinimaps
 main: com.jnngl.vanillaminimaps.VanillaMinimaps
-api-version: '1.20'
+api-version: '1.21'

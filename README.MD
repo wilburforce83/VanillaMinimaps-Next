@@ -10,7 +10,7 @@ https://github.com/JNNGL/VanillaMinimaps/assets/45935949/ea7738c9-bd4a-4388-9d65
 
 https://github.com/JNNGL/VanillaMinimaps/assets/45935949/f64aed82-8193-4c3b-9c8f-be32dc3d6fa0
 
-**Supported server version: 1.21**
+**Supported server version: 1.21.10+**
 
 ### Features
 
@@ -22,6 +22,25 @@ https://github.com/JNNGL/VanillaMinimaps/assets/45935949/f64aed82-8193-4c3b-9c8f
 - Configurable markers
 - Fullscreen map view
 - Configurable blockstate colors
+
+### Resource pack
+
+The resource pack source is in `resourcepack/`.
+Minecraft targeting is configured in `gradle.properties` via `minecraftVersion` and `resourcepackPackFormat`.
+Build a zip with:
+
+```bash
+./gradlew resourcepackZip
+```
+
+The output is written to `build/resourcepack/`.
+
+Shader sources are mirrored in `src/main/resources/shaders` for reference.
+To sync them from the resource pack and verify they match:
+
+```bash
+./gradlew syncShaderResources validateResourcepack
+```
 
 ### Mods compatibility
 

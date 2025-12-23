@@ -20,3 +20,8 @@ jobs:
         with:
           name: VanillaMinimaps
           path: build/libs/vanillaminimaps*.jar
+      - name: Upload resource pack
+        uses: actions/upload-artifact@v4.6.0
+        with:
+          name: VanillaMinimaps-resourcepack
+          path: build/resourcepack/vanillaminimaps-resourcepack-*.zip

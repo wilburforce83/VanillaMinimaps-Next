@@ -22,12 +22,10 @@ import com.jnngl.vanillaminimaps.clientside.AbstractMinimapPacketSender;
 import com.jnngl.vanillaminimaps.clientside.EntityHandle;
 import com.jnngl.vanillaminimaps.injection.PassengerRewriter;
 import com.jnngl.vanillaminimaps.map.MinimapLayer;
-import java.util.Set;
 import net.minecraft.network.protocol.game.ClientboundMapItemDataPacket;
 import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
-import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerPlayerConnection;
@@ -57,7 +55,7 @@ public class NMSMinimapPacketSender extends AbstractMinimapPacketSender {
   private void spawnItemFrame(ServerPlayerConnection connection, ItemFrame itemFrame, double offsetY) {
     ServerPlayer player = connection.getPlayer();
     itemFrame.setPos(player.getX(), player.getY() + offsetY, player.getZ());
-    connection.send(itemFrame.getAddEntityPacket(new ServerEntity((ServerLevel) itemFrame.level(), itemFrame, 0, false, p -> {}, Set.of())));
+    connection.send(itemFrame.getAddEntityPacket(NmsServerEntity.create((ServerLevel) itemFrame.level(), itemFrame)));
     var metadata = itemFrame.getEntityData().getNonDefaultValues();
     if (metadata != null && !metadata.isEmpty()) {
       connection.send(new ClientboundSetEntityDataPacket(itemFrame.getId(), metadata));

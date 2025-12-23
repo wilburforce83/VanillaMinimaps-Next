@@ -27,7 +27,6 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ClientInformation;
-import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -81,7 +80,7 @@ public class NMSSteerableLockedView implements SteerableLockedView {
             viewer.getUUID(), viewer.getGameProfile(),
             false, 0, GameType.CREATIVE, null, false, 0, null)
     )));
-    connection.send(viewer.getAddEntityPacket(new ServerEntity(viewer.serverLevel(), viewer, 0, false, p -> {}, Set.of())));
+    connection.send(viewer.getAddEntityPacket(NmsServerEntity.create((ServerLevel) viewer.level(), viewer)));
     connection.send(new ClientboundRotateHeadPacket(viewer, convertAngle(player.getYaw())));
     List<SynchedEntityData.DataValue<?>> metadata = viewer.getEntityData().getNonDefaultValues();
     if (metadata != null && !metadata.isEmpty()) {
@@ -199,7 +198,7 @@ public class NMSSteerableLockedView implements SteerableLockedView {
 
     int stateId = serverPlayer.inventoryMenu.incrementStateId();
     connection.send(new ClientboundContainerSetContentPacket(
-        0, stateId, serverPlayer.inventoryMenu.remoteSlots, serverPlayer.inventoryMenu.getCarried()));
+        0, stateId, serverPlayer.inventoryMenu.getItems(), serverPlayer.inventoryMenu.getCarried()));
 
     connection.send(new ClientboundPlayerInfoUpdatePacket(
         EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE),
