@@ -33,6 +33,7 @@ import com.jnngl.vanillaminimaps.listener.MinimapListener;
 import com.jnngl.vanillaminimaps.map.Minimap;
 import com.jnngl.vanillaminimaps.map.MinimapProvider;
 import com.jnngl.vanillaminimaps.map.fullscreen.FullscreenMinimap;
+import com.jnngl.vanillaminimaps.map.icon.PlayerHeadIconCache;
 import com.jnngl.vanillaminimaps.map.icon.provider.BuiltinMinimapIconProvider;
 import com.jnngl.vanillaminimaps.map.icon.provider.MinimapIconProvider;
 import com.jnngl.vanillaminimaps.map.renderer.world.WorldMinimapRenderer;
@@ -83,6 +84,9 @@ public final class VanillaMinimaps extends JavaPlugin implements MinimapProvider
   private MinimapIconProvider minimapIconProvider;
 
   @MonotonicNonNull
+  private PlayerHeadIconCache playerHeadIconCache;
+
+  @MonotonicNonNull
   private MinimapWorldRendererProvider worldRendererProvider;
 
   @MonotonicNonNull
@@ -115,6 +119,7 @@ public final class VanillaMinimaps extends JavaPlugin implements MinimapProvider
     defaultClientsideMinimapFactory = new NMSClientsideMinimapFactory();
     defaultMinimapPacketSender = new NMSMinimapPacketSender(this);
     minimapIconProvider = new BuiltinMinimapIconProvider(iconsPath);
+    playerHeadIconCache = new PlayerHeadIconCache(this);
     worldRendererProvider = new BuiltinMinimapWorldRendererProvider();
     minimapBlockListener = new MinimapBlockListener(this);
     minimapListener = new MinimapListener(this);
@@ -134,11 +139,14 @@ public final class VanillaMinimaps extends JavaPlugin implements MinimapProvider
     minimapBlockListener.registerListener(this);
 
     new MinimapCommand(this).register(NMSCommandDispatcherAccessor.vanillaDispatcher());
+
+    minimapListener.startOtherPlayerUpdates();
   }
 
   @Override
   @SneakyThrows
   public void onDisable() {
+    minimapListener.stopOtherPlayerUpdates();
     playerDataStorage.close();
   }
 
@@ -160,6 +168,10 @@ public final class VanillaMinimaps extends JavaPlugin implements MinimapProvider
   @Override
   public MinimapIconProvider iconProvider() {
     return minimapIconProvider;
+  }
+
+  public PlayerHeadIconCache playerHeadIconCache() {
+    return playerHeadIconCache;
   }
 
   @Override

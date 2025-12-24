@@ -20,6 +20,7 @@ package com.jnngl.vanillaminimaps.map.renderer.encoder;
 import com.jnngl.vanillaminimaps.map.Minimap;
 import com.jnngl.vanillaminimaps.map.MinimapLayer;
 import com.jnngl.vanillaminimaps.map.MinimapScreenPosition;
+import com.jnngl.vanillaminimaps.config.Config;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -36,6 +37,7 @@ public class PrimaryMapEncoder {
     MapEncoderUtils.encodeFixedPoint(data, 1, 0, fractionalX);
     MapEncoderUtils.encodeFixedPoint(data, 9, 0, fractionalZ);
     data[17] = right ? (byte) 4 : (byte) 0;
+    data[18] = Config.instance().minimapShape == Config.MinimapShape.SQUARE ? (byte) 4 : (byte) 0;
     data[128] = (byte) 0;
   }
 }

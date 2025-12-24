@@ -27,6 +27,7 @@ out float keepEdges;
 out float transition;
 out float fullscreenMinimap;
 out float sx, sy;
+out float squareMinimap;
 
 #moj_import <minimap/vertex_util.glsl>
 

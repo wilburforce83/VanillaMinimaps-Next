@@ -114,6 +114,10 @@ public final class Minimap {
     PrimaryMapEncoder.encodePrimaryLayer(this, layer);
     provider.packetSender().updateLayer(holder, primaryLayer, 0, 0, 128, 128, layer);
 
+    updateSecondaryLayers(provider);
+  }
+
+  public void updateSecondaryLayers(MinimapProvider provider) {
     for (SecondaryMinimapLayer secondary : secondaryLayers.values()) {
       if (secondary.getWorld() != null && !secondary.getWorld().equals(holder.getWorld())) {
         continue;

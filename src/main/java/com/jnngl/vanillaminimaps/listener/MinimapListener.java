@@ -46,11 +46,14 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
 import org.jetbrains.annotations.Nullable;
 
 public class MinimapListener implements Listener {
+
+  private static final String OTHER_PLAYER_PREFIX = "other_player:";
 
   @Getter
   private final Map<UUID, Minimap> playerMinimaps = new HashMap<>();
@@ -60,6 +63,7 @@ public class MinimapListener implements Listener {
   private final Map<UUID, IntIntImmutablePair> playerSections = new HashMap<>();
   private final Set<UUID> requestedUpdates = new HashSet<>();
   private final VanillaMinimaps plugin;
+  private BukkitTask otherPlayersTask;
 
   public MinimapListener(VanillaMinimaps plugin) {
     this.plugin = plugin;
@@ -74,6 +78,17 @@ public class MinimapListener implements Listener {
         throw new RuntimeException(e);
       }
     });
+
+    Config.Markers.OtherPlayers otherPlayers = Config.instance().markers.otherPlayers;
+    if (otherPlayers.enabled && otherPlayers.usePlayerHeads) {
+      plugin.playerHeadIconCache().refresh(event.getPlayer())
+          .thenAccept(icon -> {
+            if (icon == null) {
+              return;
+            }
+            Bukkit.getScheduler().runTask(plugin, () -> updateOtherPlayerIcon(event.getPlayer().getUniqueId(), icon));
+          });
+    }
   }
 
   public Minimap enableMinimap(Player player) {
@@ -116,6 +131,10 @@ public class MinimapListener implements Listener {
     }
 
     minimap.update(plugin, player.getX(), player.getZ(), true);
+
+    if (otherPlayerMarkersEnabled()) {
+      syncOtherPlayerMarkers(minimap, Bukkit.getOnlinePlayers());
+    }
     return minimap;
   }
 
@@ -154,6 +173,21 @@ public class MinimapListener implements Listener {
     FullscreenMinimap fullscreenMinimap = fullscreenMinimaps.remove(player.getUniqueId());
     if (fullscreenMinimap != null) {
       fullscreenMinimap.despawn(plugin, null);
+    }
+  }
+
+  public void startOtherPlayerUpdates() {
+    if (!otherPlayerMarkersEnabled()) {
+      return;
+    }
+    int interval = Math.max(1, Config.instance().markers.otherPlayers.updateIntervalTicks);
+    otherPlayersTask = Bukkit.getScheduler().runTaskTimer(plugin, this::updateOtherPlayerMarkers, interval, interval);
+  }
+
+  public void stopOtherPlayerUpdates() {
+    if (otherPlayersTask != null) {
+      otherPlayersTask.cancel();
+      otherPlayersTask = null;
     }
   }
 
@@ -224,11 +258,134 @@ public class MinimapListener implements Listener {
   @SneakyThrows
   @EventHandler
   public void onQuit(PlayerQuitEvent event) {
+    removeOtherPlayerMarkers(event.getPlayer().getUniqueId());
+    plugin.playerHeadIconCache().remove(event.getPlayer().getUniqueId());
     Minimap minimap = disableMinimap(event.getPlayer());
 
     // minimap can be null if player has it disabled
     if (minimap != null) {
       plugin.playerDataStorage().save(minimap);
     }
+  }
+
+  private void updateOtherPlayerMarkers() {
+    if (!otherPlayerMarkersEnabled()) {
+      return;
+    }
+
+    Collection<? extends Player> onlinePlayers = Bukkit.getOnlinePlayers();
+    for (Minimap minimap : playerMinimaps.values()) {
+      syncOtherPlayerMarkers(minimap, onlinePlayers);
+    }
+  }
+
+  private void syncOtherPlayerMarkers(Minimap minimap, Collection<? extends Player> onlinePlayers) {
+    Player viewer = minimap.holder();
+    if (!viewer.isOnline()) {
+      return;
+    }
+
+    Config.Markers.OtherPlayers otherPlayers = Config.instance().markers.otherPlayers;
+    Set<String> activeKeys = new HashSet<>();
+    for (Player target : onlinePlayers) {
+      if (target.getUniqueId().equals(viewer.getUniqueId())) {
+        continue;
+      }
+
+      String key = otherPlayerKey(target.getUniqueId());
+      activeKeys.add(key);
+
+      SecondaryMinimapLayer layer = minimap.secondaryLayers().get(key);
+      MinimapIcon icon = resolveOtherPlayerIcon(target.getUniqueId());
+      if (icon == null) {
+        continue;
+      }
+      MinimapIcon offscreenIcon = plugin.iconProvider().getIcon("offscreen_player");
+      if (offscreenIcon == null) {
+        offscreenIcon = icon;
+      }
+
+      if (layer == null) {
+        MinimapLayer baseLayer = plugin.clientsideMinimapFactory().createMinimapLayer(viewer.getWorld(), null);
+        MinimapIconRenderer renderer = new MinimapIconRenderer(icon, offscreenIcon);
+        Location location = target.getLocation();
+        layer = new MarkerMinimapLayer(baseLayer, renderer, true, otherPlayers.keepOnEdge, target.getWorld(),
+            location.getBlockX(), location.getBlockZ(), 0.35F);
+        minimap.secondaryLayers().put(key, layer);
+        plugin.packetSender().spawnLayer(viewer, baseLayer);
+      } else if (!(layer.getRenderer() instanceof MinimapIconRenderer iconRenderer)
+          || !Objects.equals(iconRenderer.icon(), icon)
+          || !Objects.equals(iconRenderer.fullscreenIcon(), offscreenIcon)) {
+        layer.setRenderer(new MinimapIconRenderer(icon, offscreenIcon));
+      }
+
+      Location location = target.getLocation();
+      layer.setWorld(location.getWorld());
+      layer.setPositionX(location.getBlockX());
+      layer.setPositionZ(location.getBlockZ());
+      layer.setKeepOnEdge(otherPlayers.keepOnEdge);
+    }
+
+    Iterator<Map.Entry<String, SecondaryMinimapLayer>> iterator = minimap.secondaryLayers().entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, SecondaryMinimapLayer> entry = iterator.next();
+      if (!entry.getKey().startsWith(OTHER_PLAYER_PREFIX)) {
+        continue;
+      }
+      if (activeKeys.contains(entry.getKey())) {
+        continue;
+      }
+      plugin.packetSender().despawnLayer(viewer, entry.getValue().getBaseLayer());
+      iterator.remove();
+    }
+
+    minimap.updateSecondaryLayers(plugin);
+  }
+
+  private void updateOtherPlayerIcon(UUID targetId, MinimapIcon icon) {
+    MinimapIcon offscreenIcon = plugin.iconProvider().getIcon("offscreen_player");
+    if (offscreenIcon == null) {
+      offscreenIcon = icon;
+    }
+    String key = otherPlayerKey(targetId);
+    for (Minimap minimap : playerMinimaps.values()) {
+      SecondaryMinimapLayer layer = minimap.secondaryLayers().get(key);
+      if (layer == null) {
+        continue;
+      }
+      layer.setRenderer(new MinimapIconRenderer(icon, offscreenIcon));
+      minimap.updateSecondaryLayers(plugin);
+    }
+  }
+
+  private void removeOtherPlayerMarkers(UUID targetId) {
+    String key = otherPlayerKey(targetId);
+    for (Minimap minimap : playerMinimaps.values()) {
+      SecondaryMinimapLayer layer = minimap.secondaryLayers().remove(key);
+      if (layer == null) {
+        continue;
+      }
+      plugin.packetSender().despawnLayer(minimap.holder(), layer.getBaseLayer());
+    }
+  }
+
+  private MinimapIcon resolveOtherPlayerIcon(UUID targetId) {
+    Config.Markers.OtherPlayers otherPlayers = Config.instance().markers.otherPlayers;
+    MinimapIcon icon = null;
+    if (otherPlayers.usePlayerHeads) {
+      icon = plugin.playerHeadIconCache().get(targetId);
+    }
+    if (icon == null) {
+      icon = plugin.iconProvider().getIcon("player");
+    }
+    return icon;
+  }
+
+  private boolean otherPlayerMarkersEnabled() {
+    return Config.instance().markers.otherPlayers.enabled;
+  }
+
+  private String otherPlayerKey(UUID targetId) {
+    return OTHER_PLAYER_PREFIX + targetId;
   }
 }

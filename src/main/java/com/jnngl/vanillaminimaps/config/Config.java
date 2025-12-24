@@ -45,6 +45,10 @@ public class Config extends YamlSerializable {
   public String defaultMinimapRenderer = "vanilla";
 
   @NewLine
+  @Comment(@CommentValue("Available values: CIRCLE, SQUARE"))
+  public MinimapShape minimapShape = MinimapShape.CIRCLE;
+
+  @NewLine
   public Markers markers = new Markers();
 
   public static class Markers {
@@ -66,6 +70,20 @@ public class Config extends YamlSerializable {
 
       public boolean stickToBorder = true;
     }
+
+    public OtherPlayers otherPlayers = new OtherPlayers();
+
+    public static class OtherPlayers {
+
+      public boolean enabled = true;
+
+      public boolean usePlayerHeads = true;
+
+      public boolean keepOnEdge = true;
+
+      @Comment(@CommentValue("How often to update other player markers, in ticks (20 ticks = 1 second)."))
+      public int updateIntervalTicks = 40;
+    }
   }
 
   public Fullscreen fullscreen = new Fullscreen();
@@ -76,5 +94,10 @@ public class Config extends YamlSerializable {
     public int segmentsX = 5;
 
     public int segmentsZ = 3;
+  }
+
+  public enum MinimapShape {
+    CIRCLE,
+    SQUARE
   }
 }

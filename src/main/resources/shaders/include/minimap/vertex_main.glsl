@@ -4,6 +4,7 @@ minimap = 0.0;
 keepEdges = 0.0;
 sx = 0.0;
 sy = 0.0;
+squareMinimap = 0.0;
 vec2 uv = UV0;
 vec2 uv2 = vec2(0.0);
 
@@ -34,6 +35,7 @@ if (texture(Sampler0, uv).xyz == vec3(112. / 255., 108. / 255., 138. / 255.)) {
     vcolor = Color;
 
     float texel = 1. / 128.;
+    squareMinimap = sign(length(texture(Sampler0, vec2(texel * 18., 0.)).xyz)) > 0 ? 1.0 : 0.0;
     uv += vec2(texel) * vec2(-vx, -vz);
 
     if (sign(length(texture(Sampler0, vec2(texel * 17, 0.)).xyz)) > 0) {

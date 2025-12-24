@@ -3,12 +3,16 @@
 
 if (minimap == 1.0 || minimap == 2.0) {
     vec2 uvn11 = texCoord2 * 2.0 - 1.0;
-    float dist = dot(uvn11, uvn11);
-    if (dist < 0.87 || keepEdges == 1.0) {
+    float dist = squareMinimap > 0.5
+        ? max(abs(uvn11.x), abs(uvn11.y))
+        : dot(uvn11, uvn11);
+    float inner = squareMinimap > 0.5 ? 0.93 : 0.87;
+    float outer = squareMinimap > 0.5 ? 0.97 : 0.93;
+    if (dist < inner || keepEdges == 1.0) {
         vec4 color = texture(Sampler0, texCoord1);
         remapColor(color);
         fragColor = color * vertexColor * ColorModulator;
-    } else if (dist < 0.93 && minimap == 1.0) {
+    } else if (dist < outer && minimap == 1.0) {
         fragColor = vec4(17. / 255.);
         if (dist > 0.89 && dist < 0.92) {
             fragColor = vec4(40. / 255.);
