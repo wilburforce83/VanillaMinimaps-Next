@@ -24,12 +24,24 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.game.ClientboundSetPassengersPacket;
+
+import java.lang.reflect.Field;
 
 public class PassengerRewriter extends ChannelOutboundHandlerAdapter {
 
   private final Int2ObjectMap<IntList> passengers = new Int2ObjectOpenHashMap<>();
+  private static final Field PASSENGERS_FIELD;
+
+  static {
+    try {
+      Field field = ClientboundSetPassengersPacket.class.getDeclaredField("passengers");
+      field.setAccessible(true);
+      PASSENGERS_FIELD = field;
+    } catch (NoSuchFieldException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
 
   @Override
   public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -38,23 +50,15 @@ public class PassengerRewriter extends ChannelOutboundHandlerAdapter {
       IntList passengers = this.passengers.get(vehicle);
       if (passengers != null) {
         synchronized (passengers) {
-          FriendlyByteBuf buf = new FriendlyByteBuf(ctx.alloc().ioBuffer());
-          buf.writeVarInt(0x65); // Packet ID
-          buf.writeVarInt(packet.getVehicle()); // Vehicle ID
-          buf.writeVarInt(packet.getPassengers().length + passengers.size()); // Passenger count
-          for (int passenger : packet.getPassengers()) {
-            buf.writeVarInt(passenger);
+          int[] merged = mergePassengers(packet.getPassengers(), passengers);
+          if (merged != packet.getPassengers()) {
+            setPassengers(packet, merged);
           }
-          for (int passenger : passengers) {
-            buf.writeVarInt(passenger);
-          }
-          ctx.write(buf);
-          return;
         }
       }
     }
 
-    ctx.write(msg);
+    ctx.write(msg, promise);
   }
 
   public Int2ObjectMap<IntList> passengers() {
@@ -81,6 +85,32 @@ public class PassengerRewriter extends ChannelOutboundHandlerAdapter {
       if (passengers.isEmpty()) {
         this.passengers.remove(vehicle);
       }
+    }
+  }
+
+  private static int[] mergePassengers(int[] existing, IntList extra) {
+    if (extra.isEmpty()) {
+      return existing;
+    }
+    IntArrayList merged = new IntArrayList(existing.length + extra.size());
+    for (int passenger : existing) {
+      if (!merged.contains(passenger)) {
+        merged.add(passenger);
+      }
+    }
+    for (int passenger : extra) {
+      if (!merged.contains(passenger)) {
+        merged.add(passenger);
+      }
+    }
+    return merged.size() == existing.length ? existing : merged.toIntArray();
+  }
+
+  private static void setPassengers(ClientboundSetPassengersPacket packet, int[] passengers) {
+    try {
+      PASSENGERS_FIELD.set(packet, passengers);
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException("Unable to update passengers packet", e);
     }
   }
 }
