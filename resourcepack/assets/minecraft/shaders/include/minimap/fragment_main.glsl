@@ -6,17 +6,22 @@ if (minimap == 1.0 || minimap == 2.0) {
     float dist = squareMinimap > 0.5
         ? max(abs(uvn11.x), abs(uvn11.y))
         : dot(uvn11, uvn11);
-    float inner = squareMinimap > 0.5 ? 0.93 : 0.87;
+    float innerBase = squareMinimap > 0.5 ? 0.93 : 0.87;
     float outer = squareMinimap > 0.5 ? 0.97 : 0.93;
+    float inner = outer - (outer - innerBase) * 0.5;
+    float ringWidth = outer - inner;
+    float ring1Start = inner + ringWidth * 0.3333333;
+    float ring1End = inner + ringWidth * 0.8333333;
+    float ring2Start = inner + ringWidth * 0.5;
     if (dist < inner || keepEdges == 1.0) {
         vec4 color = texture(Sampler0, texCoord1);
         remapColor(color);
         fragColor = color * vertexColor * ColorModulator;
     } else if (dist < outer && minimap == 1.0) {
         fragColor = vec4(17. / 255.);
-        if (dist > 0.89 && dist < 0.92) {
+        if (dist > ring1Start && dist < ring1End) {
             fragColor = vec4(40. / 255.);
-            if (dist > 0.9) {
+            if (dist > ring2Start) {
                 fragColor = vec4(70. / 255.);
             }
         }

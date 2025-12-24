@@ -26,16 +26,18 @@ if (texture(Sampler0, uv).xyz == vec3(112. / 255., 108. / 255., 138. / 255.)) {
 
     float vx = decodeFixedPoint(1, 0);
     float vz = decodeFixedPoint(9, 0);
+    float texel = 1. / 128.;
+    squareMinimap = sign(length(texture(Sampler0, vec2(texel * 18., 0.)).xyz)) > 0 ? 1.0 : 0.0;
+    float squareScale = squareMinimap > 0.5 ? 0.70710678 : 1.0;
 
     uv -= vec2(0.5);
+    uv *= squareScale;
     uv = uv * mat2_rotate_z(mod(yaw + 180, 360) - 180);
     uv += vec2(0.5);
 
     minimap = 1.0;
     vcolor = Color;
 
-    float texel = 1. / 128.;
-    squareMinimap = sign(length(texture(Sampler0, vec2(texel * 18., 0.)).xyz)) > 0 ? 1.0 : 0.0;
     uv += vec2(texel) * vec2(-vx, -vz);
 
     if (sign(length(texture(Sampler0, vec2(texel * 17, 0.)).xyz)) > 0) {
