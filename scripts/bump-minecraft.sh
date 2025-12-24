@@ -105,11 +105,19 @@ path, pack_format = sys.argv[1:3]
 with open(path, "r", encoding="utf-8") as fh:
     data = fh.read()
 
-pattern = re.compile(r'"pack_format"\s*:\s*\d+')
-if not pattern.search(data):
-    raise SystemExit("pack_format not found in pack.mcmeta")
+pack_pattern = re.compile(r'"pack_format"\s*:\s*\d+')
+min_pattern = re.compile(r'"min_format"\s*:\s*\d+')
+max_pattern = re.compile(r'"max_format"\s*:\s*\d+')
 
-updated = pattern.sub(f'"pack_format": {pack_format}', data)
+if pack_pattern.search(data):
+    updated = pack_pattern.sub(f'"pack_format": {pack_format}', data)
+elif min_pattern.search(data) or max_pattern.search(data):
+    if not min_pattern.search(data) or not max_pattern.search(data):
+        raise SystemExit("pack.mcmeta must include both min_format and max_format")
+    updated = min_pattern.sub(f'"min_format": {pack_format}', data)
+    updated = max_pattern.sub(f'"max_format": {pack_format}', updated)
+else:
+    raise SystemExit("pack_format or min_format/max_format not found in pack.mcmeta")
 
 with open(path, "w", encoding="utf-8") as fh:
     fh.write(updated)

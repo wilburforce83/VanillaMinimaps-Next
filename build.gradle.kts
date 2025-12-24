@@ -71,12 +71,36 @@ tasks {
                 throw org.gradle.api.GradleException("resourcepack/pack.mcmeta is missing.")
             }
             val content = packMcmeta.readText()
-            val match = Regex("\"pack_format\"\\s*:\\s*(\\d+)").find(content)
-            val packFormat = match?.groupValues?.get(1)?.toIntOrNull()
-            if (packFormat != resourcepackPackFormatInt) {
-                throw org.gradle.api.GradleException(
-                    "resourcepack/pack.mcmeta pack_format is $packFormat, expected $resourcepackPackFormatInt."
-                )
+            val packFormatMatch = Regex("\"pack_format\"\\s*:\\s*(\\d+)").find(content)
+            val minFormatMatch = Regex("\"min_format\"\\s*:\\s*(\\d+)").find(content)
+            val maxFormatMatch = Regex("\"max_format\"\\s*:\\s*(\\d+)").find(content)
+            val packFormat = packFormatMatch?.groupValues?.get(1)?.toIntOrNull()
+            val minFormat = minFormatMatch?.groupValues?.get(1)?.toIntOrNull()
+            val maxFormat = maxFormatMatch?.groupValues?.get(1)?.toIntOrNull()
+            if (packFormat != null) {
+                if (packFormat != resourcepackPackFormatInt) {
+                    throw org.gradle.api.GradleException(
+                        "resourcepack/pack.mcmeta pack_format is $packFormat, expected $resourcepackPackFormatInt."
+                    )
+                }
+            } else if (minFormat != null || maxFormat != null) {
+                if (minFormat == null || maxFormat == null) {
+                    throw org.gradle.api.GradleException(
+                        "resourcepack/pack.mcmeta must define both min_format and max_format."
+                    )
+                }
+                if (minFormat > maxFormat) {
+                    throw org.gradle.api.GradleException(
+                        "resourcepack/pack.mcmeta min_format ($minFormat) is greater than max_format ($maxFormat)."
+                    )
+                }
+                if (resourcepackPackFormatInt < minFormat || resourcepackPackFormatInt > maxFormat) {
+                    throw org.gradle.api.GradleException(
+                        "resourcepack/pack.mcmeta supports $minFormat-$maxFormat, expected $resourcepackPackFormatInt."
+                    )
+                }
+            } else {
+                throw org.gradle.api.GradleException("resourcepack/pack.mcmeta missing pack_format or min_format/max_format.")
             }
             val shadersDir = resourcepackShadersRoot.asFile
             if (!shadersDir.exists()) {
