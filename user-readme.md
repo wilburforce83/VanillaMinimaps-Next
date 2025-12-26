@@ -43,6 +43,7 @@ Common settings:
 - `defaultPosition`: `LEFT` or `RIGHT`
 - `defaultMinimapRenderer`: `vanilla` or `flat`
 - `minimapShape`: `CIRCLE` or `SQUARE`
+- `minimapScale`: `1` (1 block per pixel; higher values zoom out)
 - `markers.deathMarker.enabled`: show death marker
 - `markers.customMarkers.limit`: max custom markers per player
 - `markers.otherPlayers.enabled`: show other online players

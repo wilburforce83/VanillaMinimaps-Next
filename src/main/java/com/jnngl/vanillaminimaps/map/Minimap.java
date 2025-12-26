@@ -28,9 +28,11 @@ import com.jnngl.vanillaminimaps.map.renderer.encoder.SecondaryMapEncoder;
 import com.jnngl.vanillaminimaps.map.renderer.world.cache.CacheableWorldMinimapRenderer;
 import com.jnngl.vanillaminimaps.map.renderer.world.cache.WorldMapCache;
 import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.util.LinkedHashMap;
@@ -56,62 +58,104 @@ public final class Minimap {
     byte[] layer = new byte[128 * 128];
     MinimapLayerRenderer primaryRenderer = primaryLayer.renderer();
     if (primaryRenderer instanceof CacheableWorldMinimapRenderer cacheableRenderer) {
-      int blockX = (int) Math.floor(playerX);
-      int blockZ = (int) Math.floor(playerZ);
-      int alignedTrackX = (blockX >> 7) << 7;
-      int alignedTrackZ = (blockZ >> 7) << 7;
-      Location location = holder.getLocation();
-      int alignedX = (location.getBlockX() >> 7) << 7;
-      int alignedZ = (location.getBlockZ() >> 7) << 7;
-      int offsetX = location.getBlockX() % 128;
-      int offsetZ = location.getBlockZ() % 128;
-      if (offsetX < 0) {
-        offsetX += 128;
-      }
-      if (offsetZ < 0) {
-        offsetZ += 128;
-      }
-      byte[] data = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX, alignedZ);
-      byte[] dataRight = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX + 128, alignedZ);
-      byte[] dataUpRight = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX + 128, alignedZ + 128);
-      byte[] dataUp = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX, alignedZ + 128);
-      LongList usedChunks = LongList.of(
-          WorldMapCache.getKey(holder.getWorld(), alignedTrackX, alignedTrackZ),
-          WorldMapCache.getKey(holder.getWorld(), alignedTrackX + 128, alignedTrackZ),
-          WorldMapCache.getKey(holder.getWorld(), alignedTrackX + 128, alignedTrackZ + 128),
-          WorldMapCache.getKey(holder.getWorld(), alignedTrackX, alignedTrackZ + 128)
-      );
-      for (int z = 0; z < 128; z++) {
-        for (int x = 0; x < 128; x++) {
-          int dataX = x - offsetX;
-          int dataZ = z - offsetZ;
-          byte[] buffer = data;
+      int scale = MinimapScale.get();
+      if (scale == 1) {
+        int blockX = (int) Math.floor(playerX);
+        int blockZ = (int) Math.floor(playerZ);
+        int alignedTrackX = (blockX >> 7) << 7;
+        int alignedTrackZ = (blockZ >> 7) << 7;
+        Location location = holder.getLocation();
+        int alignedX = (location.getBlockX() >> 7) << 7;
+        int alignedZ = (location.getBlockZ() >> 7) << 7;
+        int offsetX = location.getBlockX() % 128;
+        int offsetZ = location.getBlockZ() % 128;
+        if (offsetX < 0) {
+          offsetX += 128;
+        }
+        if (offsetZ < 0) {
+          offsetZ += 128;
+        }
+        byte[] data = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX, alignedZ);
+        byte[] dataRight = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX + 128, alignedZ);
+        byte[] dataUpRight = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX + 128, alignedZ + 128);
+        byte[] dataUp = cacheableRenderer.getWorldMapCache().get(holder.getWorld(), alignedX, alignedZ + 128);
+        LongList usedChunks = LongList.of(
+            WorldMapCache.getKey(holder.getWorld(), alignedTrackX, alignedTrackZ),
+            WorldMapCache.getKey(holder.getWorld(), alignedTrackX + 128, alignedTrackZ),
+            WorldMapCache.getKey(holder.getWorld(), alignedTrackX + 128, alignedTrackZ + 128),
+            WorldMapCache.getKey(holder.getWorld(), alignedTrackX, alignedTrackZ + 128)
+        );
+        for (int z = 0; z < 128; z++) {
+          for (int x = 0; x < 128; x++) {
+            int dataX = x - offsetX;
+            int dataZ = z - offsetZ;
+            byte[] buffer = data;
 
-          if (dataX < 0 && dataZ < 0) {
-            dataX += 128;
-            dataZ += 128;
-            buffer = dataUpRight;
-          } else if (dataX < 0) {
-            dataX += 128;
-            buffer = dataRight;
-          } else if (dataZ < 0) {
-            dataZ += 128;
-            buffer = dataUp;
-          }
+            if (dataX < 0 && dataZ < 0) {
+              dataX += 128;
+              dataZ += 128;
+              buffer = dataUpRight;
+            } else if (dataX < 0) {
+              dataX += 128;
+              buffer = dataRight;
+            } else if (dataZ < 0) {
+              dataZ += 128;
+              buffer = dataUp;
+            }
 
-          if (dataX > 0 && dataZ > 0) {
-            layer[(127 - dataZ) * 128 + (127 - dataX)] = buffer[(127 - z) * 128 + (127 - x)];
+            if (dataX > 0 && dataZ > 0) {
+              layer[(127 - dataZ) * 128 + (127 - dataX)] = buffer[(127 - z) * 128 + (127 - x)];
+            }
           }
         }
-      }
 
-      if (updateViewerKeys) {
-        cacheableRenderer.getWorldMapCache().setViewerChunks(holder.getUniqueId(), usedChunks);
+        if (updateViewerKeys) {
+          cacheableRenderer.getWorldMapCache().setViewerChunks(holder.getUniqueId(), usedChunks);
+        }
+      } else {
+        int centerX = ((int) Math.floor(playerX / scale)) * scale;
+        int centerZ = ((int) Math.floor(playerZ / scale)) * scale;
+        int startX = centerX - 64 * scale;
+        int startZ = centerZ - 64 * scale;
+        int endX = startX + 128 * scale - 1;
+        int endZ = startZ + 128 * scale - 1;
+        WorldMapCache<?> cache = cacheableRenderer.getWorldMapCache();
+        World world = holder.getWorld();
+
+        for (int z = 0; z < 128; z++) {
+          int worldZ = startZ + z * scale;
+          int alignedZ = ((worldZ + 64) >> 7) << 7;
+          int dataZ = worldZ - (alignedZ - 64);
+          for (int x = 0; x < 128; x++) {
+            int worldX = startX + x * scale;
+            int alignedX = ((worldX + 64) >> 7) << 7;
+            int dataX = worldX - (alignedX - 64);
+            byte[] buffer = cache.get(world, alignedX, alignedZ);
+            int inputIndex = (127 - dataZ) * 128 + (127 - dataX);
+            int outputIndex = (127 - z) * 128 + (127 - x);
+            layer[outputIndex] = buffer[inputIndex];
+          }
+        }
+
+        boolean updateKeys = updateViewerKeys || scale != 1;
+        if (updateKeys) {
+          LongArrayList usedChunks = new LongArrayList();
+          int alignedStartX = ((startX + 64) >> 7) << 7;
+          int alignedStartZ = ((startZ + 64) >> 7) << 7;
+          int alignedEndX = ((endX + 64) >> 7) << 7;
+          int alignedEndZ = ((endZ + 64) >> 7) << 7;
+          for (int x = alignedStartX; x <= alignedEndX; x += 128) {
+            for (int z = alignedStartZ; z <= alignedEndZ; z += 128) {
+              usedChunks.add(WorldMapCache.getKey(world, x, z));
+            }
+          }
+          cacheableRenderer.getWorldMapCache().setViewerChunks(holder.getUniqueId(), usedChunks);
+        }
       }
     } else {
       primaryRenderer.render(this, primaryLayer, layer);
     }
-    PrimaryMapEncoder.encodePrimaryLayer(this, layer);
+    PrimaryMapEncoder.encodePrimaryLayer(screenPosition == MinimapScreenPosition.RIGHT, playerX, playerZ, layer);
     provider.packetSender().updateLayer(holder, primaryLayer, 0, 0, 128, 128, layer);
 
     updateSecondaryLayers(provider);

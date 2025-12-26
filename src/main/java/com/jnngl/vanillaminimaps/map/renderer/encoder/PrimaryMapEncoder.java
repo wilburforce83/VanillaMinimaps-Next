@@ -18,21 +18,24 @@
 package com.jnngl.vanillaminimaps.map.renderer.encoder;
 
 import com.jnngl.vanillaminimaps.map.Minimap;
-import com.jnngl.vanillaminimaps.map.MinimapLayer;
 import com.jnngl.vanillaminimaps.map.MinimapScreenPosition;
 import com.jnngl.vanillaminimaps.config.Config;
+import com.jnngl.vanillaminimaps.map.MinimapScale;
 import org.bukkit.Location;
-import org.bukkit.util.Vector;
 
 public class PrimaryMapEncoder {
 
   public static void encodePrimaryLayer(Minimap minimap, byte[] data) {
     Location location = minimap.holder().getLocation();
-    Vector fractional = location.clone().subtract(location.toBlockLocation()).toVector();
-    encodePrimaryLayer(minimap.screenPosition() == MinimapScreenPosition.RIGHT, fractional.getX(), fractional.getZ(), data);
+    encodePrimaryLayer(minimap.screenPosition() == MinimapScreenPosition.RIGHT, location.getX(), location.getZ(), data);
   }
 
-  public static void encodePrimaryLayer(boolean right, double fractionalX, double fractionalZ, byte[] data) {
+  public static void encodePrimaryLayer(boolean right, double playerX, double playerZ, byte[] data) {
+    int scale = MinimapScale.get();
+    double scaledX = playerX / scale;
+    double scaledZ = playerZ / scale;
+    double fractionalX = scaledX - Math.floor(scaledX);
+    double fractionalZ = scaledZ - Math.floor(scaledZ);
     MapEncoderUtils.markCorners(data);
     MapEncoderUtils.encodeFixedPoint(data, 1, 0, fractionalX);
     MapEncoderUtils.encodeFixedPoint(data, 9, 0, fractionalZ);

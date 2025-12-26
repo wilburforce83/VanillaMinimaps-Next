@@ -25,6 +25,7 @@ import com.jnngl.vanillaminimaps.clientside.SteerableLockedView;
 import com.jnngl.vanillaminimaps.config.Config;
 import com.jnngl.vanillaminimaps.map.Minimap;
 import com.jnngl.vanillaminimaps.map.MinimapLayer;
+import com.jnngl.vanillaminimaps.map.MinimapScale;
 import com.jnngl.vanillaminimaps.map.SecondaryMinimapLayer;
 import com.jnngl.vanillaminimaps.map.fullscreen.FullscreenMinimap;
 import com.jnngl.vanillaminimaps.map.icon.MinimapIcon;
@@ -49,6 +50,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class MinimapListener implements Listener {
@@ -118,8 +120,9 @@ public class MinimapListener implements Listener {
 
     if (worldRenderer instanceof CacheableWorldMinimapRenderer cacheable) {
       cacheable.getWorldMapCache().setCallback(player.getUniqueId(), area -> {
-        if (area.x() >= player.getX() - 64 && area.y() >= player.getZ() - 64 &&
-            area.x() + area.z() <= player.getX() + 64 && area.y() + area.w() <= player.getZ() + 64 &&
+        int range = 64 * MinimapScale.get();
+        if (area.x() >= player.getX() - range && area.y() >= player.getZ() - range &&
+            area.x() + area.z() <= player.getX() + range && area.y() + area.w() <= player.getZ() + range &&
             requestedUpdates.add(player.getUniqueId())) {
           Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
             if (requestedUpdates.remove(player.getUniqueId())) {
@@ -154,12 +157,20 @@ public class MinimapListener implements Listener {
     return minimap;
   }
 
+  @Nullable
   public SteerableLockedView openFullscreen(FullscreenMinimap minimap) {
-    SteerableLockedView view = plugin.steerableViewFactory().lockedView(minimap.getHolder());
+    SteerableLockedView view = null;
+    try {
+      view = plugin.steerableViewFactory().lockedView(minimap.getHolder());
+    } catch (Throwable t) {
+      plugin.getLogger().log(Level.WARNING, "Failed to lock view for fullscreen minimap.", t);
+    }
     minimap.spawn(plugin);
 
     fullscreenMinimaps.put(minimap.getHolder().getUniqueId(), minimap);
-    lockedViews.put(minimap.getHolder().getUniqueId(), view);
+    if (view != null) {
+      lockedViews.put(minimap.getHolder().getUniqueId(), view);
+    }
 
     return view;
   }

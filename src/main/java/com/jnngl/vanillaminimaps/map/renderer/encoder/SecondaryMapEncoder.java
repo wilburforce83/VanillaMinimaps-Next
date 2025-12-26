@@ -19,7 +19,11 @@ package com.jnngl.vanillaminimaps.map.renderer.encoder;
 
 import com.jnngl.vanillaminimaps.map.Minimap;
 import com.jnngl.vanillaminimaps.map.MinimapScreenPosition;
+import com.jnngl.vanillaminimaps.map.MinimapScale;
 import com.jnngl.vanillaminimaps.map.SecondaryMinimapLayer;
+import com.jnngl.vanillaminimaps.map.icon.MinimapIcon;
+import com.jnngl.vanillaminimaps.map.renderer.MinimapBorder;
+import com.jnngl.vanillaminimaps.map.renderer.MinimapIconRenderer;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -28,43 +32,51 @@ public class SecondaryMapEncoder {
   public static void encodeSecondaryLayer(Minimap minimap, SecondaryMinimapLayer layer, byte[] data) {
     Location location = minimap.holder().getLocation();
 
-    int trackedX = layer.getPositionX();
-    int trackedZ = layer.getPositionZ();
-    double positionX = 0;
-    double positionZ = 0;
+    double trackedX = layer.getPositionX();
+    double trackedZ = layer.getPositionZ();
+    int scale = MinimapScale.get();
     if (layer.isTrackLocation()) {
-      trackedZ = location.getBlockX() - layer.getPositionX(); // (Not a typo)
-      trackedX = location.getBlockZ() - layer.getPositionZ();
-      positionX = location.getX() - location.getBlockX();
-      positionZ = location.getZ() - location.getBlockZ();
+      int centerBlockX = ((int) Math.floor(location.getX() / scale)) * scale;
+      int centerBlockZ = ((int) Math.floor(location.getZ() / scale)) * scale;
+      trackedZ = (centerBlockX - layer.getPositionX()) / (double) scale; // (Not a typo)
+      trackedX = (centerBlockZ - layer.getPositionZ()) / (double) scale;
       if (layer.isKeepOnEdge()) {
         Vector direction = new Vector(trackedX, 0, trackedZ);
-        if (direction.lengthSquared() > 60 * 60) {
+        double edgeRadius = MinimapBorder.clampRadius(resolveIcon(layer));
+        if (direction.lengthSquared() > edgeRadius * edgeRadius) {
           direction.normalize();
-          direction.multiply(60);
-          trackedX = direction.getBlockX();
-          trackedZ = direction.getBlockZ();
-          positionX = direction.getZ() - trackedZ;
-          positionZ = direction.getX() - trackedX;
+          direction.multiply(edgeRadius);
+          trackedX = direction.getX();
+          trackedZ = direction.getZ();
         }
       }
       trackedX += 64;
       trackedZ += 64;
     }
 
-    PrimaryMapEncoder.encodePrimaryLayer(minimap.screenPosition() == MinimapScreenPosition.RIGHT, positionX, positionZ, data);
+    PrimaryMapEncoder.encodePrimaryLayer(minimap.screenPosition() == MinimapScreenPosition.RIGHT, location.getX(), location.getZ(), data);
     Location position = new Location(location.getWorld(), layer.getPositionX(), location.getY(), layer.getPositionZ());
-    boolean tracked = !layer.isTrackLocation() || layer.isKeepOnEdge() || location.distanceSquared(position) < 64 * 64;
-    if (tracked && trackedX >= 0 && trackedX < 128 && trackedZ >= 0 && trackedZ < 128) {
+    double maxDistance = 64.0 * scale;
+    int mapX = (int) Math.round(trackedX);
+    int mapZ = (int) Math.round(trackedZ);
+    boolean tracked = !layer.isTrackLocation() || layer.isKeepOnEdge() || location.distanceSquared(position) < maxDistance * maxDistance;
+    if (tracked && mapX >= 0 && mapX < 128 && mapZ >= 0 && mapZ < 128) {
       MapEncoderUtils.encodeFixedPoint(data, 1, 1, layer.getDepth());
-      MapEncoderUtils.encodeFixedPoint(data, 9, 1, trackedX / 128.0);
+      MapEncoderUtils.encodeFixedPoint(data, 9, 1, mapX / 128.0);
       data[128 * 2] = (byte) 4;
-      MapEncoderUtils.encodeFixedPoint(data, 1, 2, trackedZ / 128.0);
+      MapEncoderUtils.encodeFixedPoint(data, 1, 2, mapZ / 128.0);
       data[128 * 2 + 9] = layer.isKeepOnEdge() ? (byte) 4 : (byte) 0;
     } else {
       data[128 * 2] = (byte) 0;
     }
 
     data[128] = (byte) 4;
+  }
+
+  private static MinimapIcon resolveIcon(SecondaryMinimapLayer layer) {
+    if (layer.getRenderer() instanceof MinimapIconRenderer iconRenderer) {
+      return iconRenderer.icon();
+    }
+    return null;
   }
 }

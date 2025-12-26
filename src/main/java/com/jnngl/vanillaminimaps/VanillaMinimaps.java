@@ -23,6 +23,7 @@ import com.jnngl.vanillaminimaps.clientside.SteerableViewFactory;
 import com.jnngl.vanillaminimaps.clientside.impl.NMSClientsideMinimapFactory;
 import com.jnngl.vanillaminimaps.clientside.impl.NMSMinimapPacketSender;
 import com.jnngl.vanillaminimaps.clientside.impl.NMSSteerableViewFactory;
+import com.jnngl.vanillaminimaps.command.MinimapBukkitCommand;
 import com.jnngl.vanillaminimaps.command.MinimapCommand;
 import com.jnngl.vanillaminimaps.command.NMSCommandDispatcherAccessor;
 import com.jnngl.vanillaminimaps.config.BlockConfig;
@@ -51,6 +52,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
 
@@ -137,6 +139,15 @@ public final class VanillaMinimaps extends JavaPlugin implements MinimapProvider
     Bukkit.getPluginManager().registerEvents(this, this);
     Bukkit.getPluginManager().registerEvents(minimapListener, this);
     minimapBlockListener.registerListener(this);
+
+    PluginCommand minimapCommand = getCommand("minimap");
+    if (minimapCommand != null) {
+      MinimapBukkitCommand commandExecutor = new MinimapBukkitCommand(this);
+      minimapCommand.setExecutor(commandExecutor);
+      minimapCommand.setTabCompleter(commandExecutor);
+    } else {
+      getLogger().warning("Unable to register /minimap command. Check plugin.yml.");
+    }
 
     new MinimapCommand(this).register(NMSCommandDispatcherAccessor.vanillaDispatcher());
 

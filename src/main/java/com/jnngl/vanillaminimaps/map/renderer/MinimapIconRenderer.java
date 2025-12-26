@@ -18,6 +18,7 @@
 package com.jnngl.vanillaminimaps.map.renderer;
 
 import com.jnngl.vanillaminimaps.map.Minimap;
+import com.jnngl.vanillaminimaps.map.MinimapScale;
 import com.jnngl.vanillaminimaps.map.SecondaryMinimapLayer;
 import com.jnngl.vanillaminimaps.map.fullscreen.FullscreenMinimap;
 import com.jnngl.vanillaminimaps.map.fullscreen.FullscreenSecondaryMinimapLayer;
@@ -38,24 +39,30 @@ public record MinimapIconRenderer(MinimapIcon icon, @Nullable MinimapIcon fullsc
   @Override
   public void render(Minimap minimap, SecondaryMinimapLayer layer, byte[] data) {
     Location location = minimap.holder().getLocation();
-    int trackedX = layer.getPositionX();
-    int trackedZ = layer.getPositionZ();
+    double trackedX = layer.getPositionX();
+    double trackedZ = layer.getPositionZ();
+    int scale = MinimapScale.get();
     if (layer.isTrackLocation()) {
-      trackedZ = location.getBlockX() - layer.getPositionX();
-      trackedX = location.getBlockZ() - layer.getPositionZ();
+      int centerBlockX = ((int) Math.floor(location.getX() / scale)) * scale;
+      int centerBlockZ = ((int) Math.floor(location.getZ() / scale)) * scale;
+      trackedZ = (centerBlockX - layer.getPositionX()) / (double) scale;
+      trackedX = (centerBlockZ - layer.getPositionZ()) / (double) scale;
       if (layer.isKeepOnEdge()) {
         Vector direction = new Vector(trackedX, 0, trackedZ);
-        if (direction.lengthSquared() > 60 * 60) {
-          direction.normalize().multiply(60);
-          trackedX = direction.getBlockX();
-          trackedZ = direction.getBlockZ();
+        double edgeRadius = MinimapBorder.clampRadius(icon);
+        if (direction.lengthSquared() > edgeRadius * edgeRadius) {
+          direction.normalize().multiply(edgeRadius);
+          trackedX = direction.getX();
+          trackedZ = direction.getZ();
         }
       }
       trackedX += 64;
       trackedZ += 64;
     }
 
-    renderIcon(icon, data, trackedX, trackedZ, (x, y) -> x * 128 + y, (icon, x, y) -> y * icon.width() + icon.width() - 1 - x);
+    renderIcon(icon, data, (int) Math.round(trackedX), (int) Math.round(trackedZ),
+        (x, y) -> x * 128 + y,
+        (icon, x, y) -> y * icon.width() + icon.width() - 1 - x);
   }
 
   @Override

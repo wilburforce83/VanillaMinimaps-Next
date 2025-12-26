@@ -5,3 +5,7 @@ version: '${version}'
 website: https://github.com/JNNGL/VanillaMinimaps
 main: com.jnngl.vanillaminimaps.VanillaMinimaps
 api-version: '1.21'
+commands:
+  minimap:
+    description: Controls VanillaMinimaps.
+    usage: /minimap <enable|disable|position|marker|fullscreen>

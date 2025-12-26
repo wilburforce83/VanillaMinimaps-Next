@@ -49,6 +49,10 @@ public class Config extends YamlSerializable {
   public MinimapShape minimapShape = MinimapShape.CIRCLE;
 
   @NewLine
+  @Comment(@CommentValue("1 = default (1 block per pixel). Higher values zoom out."))
+  public int minimapScale = 1;
+
+  @NewLine
   public Markers markers = new Markers();
 
   public static class Markers {
