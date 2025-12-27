@@ -67,9 +67,56 @@ tasks {
         }
     }
 
+    register("syncResourcepackPackFormat") {
+        group = "build"
+        description = "Syncs resourcepack/pack.mcmeta pack_format with gradle.properties."
+        doLast {
+            val packMcmeta = resourcepackRoot.file("pack.mcmeta").asFile
+            if (!packMcmeta.exists()) {
+                throw org.gradle.api.GradleException("resourcepack/pack.mcmeta is missing.")
+            }
+            val content = packMcmeta.readText()
+            val packFormatValue = resourcepackPackFormatInt
+            val packPattern = Regex("\"pack_format\"\\s*:\\s*\\d+")
+            val minPattern = Regex("\"min_format\"\\s*:\\s*\\d+")
+            val maxPattern = Regex("\"max_format\"\\s*:\\s*\\d+")
+            val includeMinMax = packFormatValue >= 64
+            fun escapeJson(value: String): String {
+                return value.replace("\\", "\\\\").replace("\"", "\\\"")
+            }
+            val description = Regex("\"description\"\\s*:\\s*\"(.*?)\"")
+                .find(content)
+                ?.groupValues
+                ?.get(1)
+                ?: ""
+            val normalized = buildString {
+                appendLine("{")
+                appendLine("  \"pack\": {")
+                appendLine("    \"pack_format\": $packFormatValue,")
+                if (includeMinMax) {
+                    appendLine("    \"min_format\": $packFormatValue,")
+                    appendLine("    \"max_format\": $packFormatValue,")
+                }
+                appendLine("    \"description\": \"${escapeJson(description)}\"")
+                appendLine("  }")
+                append("}")
+            }
+            val updated = when {
+                includeMinMax -> normalized
+                minPattern.containsMatchIn(content) || maxPattern.containsMatchIn(content) -> normalized
+                packPattern.containsMatchIn(content) -> packPattern.replace(content, "\"pack_format\": $packFormatValue")
+                else -> normalized
+            }
+            if (updated != content) {
+                packMcmeta.writeText(updated)
+            }
+        }
+    }
+
     register("validateResourcepack") {
         group = "verification"
         description = "Validates the resource pack contents and pack_format."
+        dependsOn("syncResourcepackPackFormat")
         doLast {
             val packMcmeta = resourcepackRoot.file("pack.mcmeta").asFile
             if (!packMcmeta.exists()) {
@@ -77,35 +124,15 @@ tasks {
             }
             val content = packMcmeta.readText()
             val packFormatMatch = Regex("\"pack_format\"\\s*:\\s*(\\d+)").find(content)
-            val minFormatMatch = Regex("\"min_format\"\\s*:\\s*(\\d+)").find(content)
-            val maxFormatMatch = Regex("\"max_format\"\\s*:\\s*(\\d+)").find(content)
             val packFormat = packFormatMatch?.groupValues?.get(1)?.toIntOrNull()
-            val minFormat = minFormatMatch?.groupValues?.get(1)?.toIntOrNull()
-            val maxFormat = maxFormatMatch?.groupValues?.get(1)?.toIntOrNull()
             if (packFormat != null) {
                 if (packFormat != resourcepackPackFormatInt) {
                     throw org.gradle.api.GradleException(
                         "resourcepack/pack.mcmeta pack_format is $packFormat, expected $resourcepackPackFormatInt."
                     )
                 }
-            } else if (minFormat != null || maxFormat != null) {
-                if (minFormat == null || maxFormat == null) {
-                    throw org.gradle.api.GradleException(
-                        "resourcepack/pack.mcmeta must define both min_format and max_format."
-                    )
-                }
-                if (minFormat > maxFormat) {
-                    throw org.gradle.api.GradleException(
-                        "resourcepack/pack.mcmeta min_format ($minFormat) is greater than max_format ($maxFormat)."
-                    )
-                }
-                if (resourcepackPackFormatInt < minFormat || resourcepackPackFormatInt > maxFormat) {
-                    throw org.gradle.api.GradleException(
-                        "resourcepack/pack.mcmeta supports $minFormat-$maxFormat, expected $resourcepackPackFormatInt."
-                    )
-                }
             } else {
-                throw org.gradle.api.GradleException("resourcepack/pack.mcmeta missing pack_format or min_format/max_format.")
+                throw org.gradle.api.GradleException("resourcepack/pack.mcmeta missing pack_format.")
             }
             val shadersDir = resourcepackShadersRoot.asFile
             if (!shadersDir.exists()) {

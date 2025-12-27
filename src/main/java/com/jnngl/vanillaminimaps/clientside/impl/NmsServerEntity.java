@@ -18,37 +18,126 @@
 package com.jnngl.vanillaminimaps.clientside.impl;
 
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.server.level.ServerEntity;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerPlayerConnection;
 import net.minecraft.world.entity.Entity;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Proxy;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 final class NmsServerEntity {
 
-  private static final ServerEntity.Synchronizer NOOP_SYNCHRONIZER = new ServerEntity.Synchronizer() {
-    @Override
-    public void sendToTrackingPlayers(Packet<? super ClientGamePacketListener> packet) {
+  private static final Consumer<Packet<?>> NOOP_BROADCAST = packet -> { };
+  private static final BiConsumer<Packet<?>, List<UUID>> NOOP_BROADCAST_IGNORE = (packet, ignored) -> { };
+  private static final Constructor<ServerEntity> SERVER_ENTITY_CONSTRUCTOR;
+  private static final Object NOOP_SYNCHRONIZER;
+  private static final boolean USE_BROADCAST_CONSTRUCTOR;
+  private static final boolean USE_TRACKED_PLAYERS;
+
+  static {
+    Constructor<ServerEntity> constructor = null;
+    Object synchronizer = null;
+    boolean useBroadcast = false;
+    boolean useTrackedPlayers = false;
+    Class<?> synchronizerType = null;
+    int score = -1;
+
+    for (Constructor<?> candidate : ServerEntity.class.getConstructors()) {
+      Class<?>[] params = candidate.getParameterTypes();
+      if (params.length < 5
+          || params[0] != ServerLevel.class
+          || params[1] != Entity.class
+          || params[2] != int.class
+          || params[3] != boolean.class) {
+        continue;
+      }
+      if (params.length == 7
+          && Consumer.class.isAssignableFrom(params[4])
+          && BiConsumer.class.isAssignableFrom(params[5])
+          && Set.class.isAssignableFrom(params[6])) {
+        constructor = (Constructor<ServerEntity>) candidate;
+        useBroadcast = true;
+        useTrackedPlayers = true;
+        synchronizerType = null;
+        score = 3;
+        break;
+      }
+      if (params.length == 6
+          && Consumer.class.isAssignableFrom(params[4])
+          && BiConsumer.class.isAssignableFrom(params[5])
+          && score < 2) {
+        constructor = (Constructor<ServerEntity>) candidate;
+        useBroadcast = true;
+        useTrackedPlayers = false;
+        synchronizerType = null;
+        score = 2;
+        continue;
+      }
+      if (params.length == 6
+          && Set.class.isAssignableFrom(params[5])
+          && score < 2) {
+        constructor = (Constructor<ServerEntity>) candidate;
+        useBroadcast = false;
+        useTrackedPlayers = true;
+        synchronizerType = params[4];
+        score = 2;
+        continue;
+      }
+      if (params.length == 5 && score < 1) {
+        constructor = (Constructor<ServerEntity>) candidate;
+        useBroadcast = false;
+        useTrackedPlayers = false;
+        synchronizerType = params[4];
+        score = 1;
+      }
     }
 
-    @Override
-    public void sendToTrackingPlayersAndSelf(Packet<? super ClientGamePacketListener> packet) {
+    if (constructor == null) {
+      throw new ExceptionInInitializerError("Unable to resolve ServerEntity constructor");
     }
 
-    @Override
-    public void sendToTrackingPlayersFiltered(Packet<? super ClientGamePacketListener> packet,
-                                              Predicate<ServerPlayer> filter) {
+    if (!useBroadcast) {
+      if (synchronizerType == null || !synchronizerType.isInterface()) {
+        throw new ExceptionInInitializerError("Unable to resolve ServerEntity synchronizer type");
+      }
+      synchronizer = Proxy.newProxyInstance(
+          synchronizerType.getClassLoader(),
+          new Class<?>[] { synchronizerType },
+          (proxy, method, args) -> null
+      );
     }
-  };
+
+    SERVER_ENTITY_CONSTRUCTOR = constructor;
+    NOOP_SYNCHRONIZER = synchronizer;
+    USE_BROADCAST_CONSTRUCTOR = useBroadcast;
+    USE_TRACKED_PLAYERS = useTrackedPlayers;
+  }
 
   private NmsServerEntity() {
   }
 
   static ServerEntity create(ServerLevel level, Entity entity) {
-    return new ServerEntity(level, entity, 0, false, NOOP_SYNCHRONIZER, Set.of());
+    try {
+      if (USE_BROADCAST_CONSTRUCTOR) {
+        if (USE_TRACKED_PLAYERS) {
+          return SERVER_ENTITY_CONSTRUCTOR.newInstance(
+              level, entity, 0, false, NOOP_BROADCAST, NOOP_BROADCAST_IGNORE, new HashSet<>());
+        }
+        return SERVER_ENTITY_CONSTRUCTOR.newInstance(
+            level, entity, 0, false, NOOP_BROADCAST, NOOP_BROADCAST_IGNORE);
+      }
+      if (USE_TRACKED_PLAYERS) {
+        return SERVER_ENTITY_CONSTRUCTOR.newInstance(level, entity, 0, false, NOOP_SYNCHRONIZER, new HashSet<>());
+      }
+      return SERVER_ENTITY_CONSTRUCTOR.newInstance(level, entity, 0, false, NOOP_SYNCHRONIZER);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException("Unable to create ServerEntity instance", e);
+    }
   }
 }
