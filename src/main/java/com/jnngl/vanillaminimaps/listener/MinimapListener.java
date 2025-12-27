@@ -39,6 +39,7 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -185,6 +186,21 @@ public class MinimapListener implements Listener {
     if (fullscreenMinimap != null) {
       fullscreenMinimap.despawn(plugin, null);
     }
+  }
+
+  public boolean hasFullscreenHeadroom(Player player) {
+    Location location = player.getLocation();
+    World world = player.getWorld();
+    int x = location.getBlockX();
+    int y = location.getBlockY();
+    int z = location.getBlockZ();
+    if (y + 2 >= world.getMaxHeight()) {
+      return false;
+    }
+    if (!world.getBlockAt(x, y + 2, z).isPassable()) {
+      return false;
+    }
+    return true;
   }
 
   public void startOtherPlayerUpdates() {

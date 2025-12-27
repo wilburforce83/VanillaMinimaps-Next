@@ -11,7 +11,8 @@ val resourcepackPackFormat: String by project
 val resourcepackPackFormatInt = resourcepackPackFormat.toInt()
 
 group = "com.jnngl"
-version = "$pluginVersion-mc$minecraftVersion"
+val artifactVersion = "$pluginVersion-mc$minecraftVersion"
+version = artifactVersion
 
 val paperVersion = "$minecraftVersion-R0.1-SNAPSHOT"
 val resourcepackRoot = layout.projectDirectory.dir("resourcepack")
@@ -58,7 +59,11 @@ tasks {
     processResources {
         filteringCharset = "UTF-8"
         filesMatching("plugin.yml") {
-            expand("version" to version)
+            expand(
+                "pluginVersion" to pluginVersion,
+                "minecraftVersion" to minecraftVersion,
+                "artifactVersion" to artifactVersion
+            )
         }
     }
 

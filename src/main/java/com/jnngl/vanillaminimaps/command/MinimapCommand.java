@@ -43,6 +43,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.selector.EntitySelector;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
 import java.sql.SQLException;
@@ -431,6 +432,15 @@ public class MinimapCommand extends BrigadierCommand {
 
       if (getPlugin().getFullscreenMinimap(player) != null) {
         getPlugin().minimapListener().closeFullscreen(player);
+        continue;
+      }
+
+      if (!getPlugin().minimapListener().hasFullscreenHeadroom(player)) {
+        String failure = player.getName() + ": Not enough headroom for fullscreen map (need 1 block of vertical space).";
+        ctx.getSource().sendFailure(Component.literal(failure));
+        if (ctx.getSource().getEntity() != serverPlayer) {
+          player.sendMessage(ChatColor.RED + "Not enough headroom for fullscreen map (need 1 block of vertical space).");
+        }
         continue;
       }
 

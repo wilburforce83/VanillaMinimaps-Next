@@ -27,7 +27,7 @@ Minecraft targeting and versioning are centralized in `gradle.properties`.
 ./scripts/bump-minecraft.sh --mc 1.21.10 --pack-format 34 --plugin-version 1.0.1
 ```
 
-The script expects a `paper.jar` in the repo root for an offline version check.
+The script expects a `<minecraftVersion>.jar` in the repo root for an offline version check.
 Pass `--skip-paper-check` if you want to skip that check.
 It also runs shader sync + validation automatically.
 

@@ -27,6 +27,7 @@ import com.jnngl.vanillaminimaps.map.renderer.MinimapLayerRenderer;
 import com.jnngl.vanillaminimaps.map.renderer.encoder.FullscreenMapEncoder;
 import com.jnngl.vanillaminimaps.map.renderer.world.WorldMinimapRenderer;
 import lombok.*;
+import net.minecraft.world.level.material.MapColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -64,6 +65,15 @@ public class FullscreenMinimap {
 
   private static double easeOutCubic(double x) {
     return 1 - Math.pow(1 - x, 3);
+  }
+
+  private static void forceHighBrightness(byte[] data) {
+    int high = MapColor.Brightness.HIGH.id;
+    for (int i = 0; i < data.length; i++) {
+      int packed = data[i] & 0xFF;
+      int colorId = packed >> 2;
+      data[i] = (byte) ((colorId << 2) | high);
+    }
   }
 
   public CompletableFuture<Void> fadeIn(MinimapProvider provider, Function<Double, Double> easing, int duration) {
@@ -113,6 +123,7 @@ public class FullscreenMinimap {
 
     World world = holder.getWorld();
     Location holderPosition = holder.getLocation();
+    boolean forceBright = holderPosition.getBlock().getLightFromSky() < 15;
     primaryLayer.forEach(layer -> {
       provider.packetSender().updateLayer(holder, layer.base(), 0, 0, 128, 128, LOADING_MAP);
 
@@ -153,8 +164,10 @@ public class FullscreenMinimap {
         MinimapLayerRenderer renderer = layer.base().renderer();
         int baseX = layer.chunkX() << 7;
         int baseZ = layer.chunkZ() << 7;
-        if (renderer instanceof WorldMinimapRenderer worldRenderer) {
-          worldRenderer.renderFully(world, baseX, baseZ, data);
+        boolean worldRenderer = renderer instanceof WorldMinimapRenderer;
+        if (worldRenderer) {
+          WorldMinimapRenderer worldRendererInstance = (WorldMinimapRenderer) renderer;
+          worldRendererInstance.renderFully(world, baseX, baseZ, data);
         } else {
           renderer.render(baseMinimap, layer.base(), data);
         }
@@ -164,6 +177,10 @@ public class FullscreenMinimap {
           for (int x = 0; x < 128; x++) {
             buffer[x * 128 + z] = data[(127 - z) * 128 + x];
           }
+        }
+
+        if (worldRenderer && forceBright) {
+          forceHighBrightness(buffer);
         }
 
         secondaryLayers.forEach(secondary -> {

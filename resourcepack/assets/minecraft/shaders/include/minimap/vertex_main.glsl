@@ -36,7 +36,7 @@ if (texture(Sampler0, uv).xyz == vec3(112. / 255., 108. / 255., 138. / 255.)) {
     uv += vec2(0.5);
 
     minimap = 1.0;
-    vcolor = Color;
+    vcolor = vec4(1.0);
 
     uv += vec2(texel) * vec2(-vx, -vz);
 
@@ -87,7 +87,7 @@ if (texture(Sampler0, uv).xyz == vec3(112. / 255., 108. / 255., 138. / 255.)) {
             case 2: { gl_Position = vec4(left + 0.64 * (segmentX + 1) * vratio, top - 0.64 * (segmentY + 1) * ratio, -0.5, 1); uv2 = vec2(1, 0); break; }
             case 3: { gl_Position = vec4(left + 0.64 * (segmentX + 1) * vratio, top - 0.64 * segmentY * ratio,       -0.5, 1); uv2 = vec2(1, 1); break; }
         }
-        vcolor = Color;
+        vcolor = vec4(1.0);
         fullscreenMinimap = 1.0;
     } else if (fullscreenMagic == 109) {
         transition = decodeFixedPoint(8, 0);
@@ -98,7 +98,7 @@ if (texture(Sampler0, uv).xyz == vec3(112. / 255., 108. / 255., 138. / 255.)) {
             case 2: { gl_Position = vec4(1, -1, -0.4, 1); uv2 = vec2(1, 0); break; }
             case 3: { gl_Position = vec4(1, 1, -0.4, 1); uv2 = vec2(1, 1); break; }
         }
-        vcolor = Color;
+        vcolor = vec4(1.0);
         fullscreenMinimap = 2.0;
     }
 }

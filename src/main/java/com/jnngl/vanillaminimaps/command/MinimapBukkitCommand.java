@@ -397,6 +397,15 @@ public class MinimapBukkitCommand implements TabExecutor {
         continue;
       }
 
+      if (!plugin.minimapListener().hasFullscreenHeadroom(player)) {
+        String failure = player.getName() + ": Not enough headroom for fullscreen map (need 1 block of vertical space).";
+        sendFailure(sender, failure);
+        if (sender != player) {
+          player.sendMessage(ChatColor.RED + "Not enough headroom for fullscreen map (need 1 block of vertical space).");
+        }
+        continue;
+      }
+
       FullscreenMinimap fullscreenMinimap = FullscreenMinimap.create(plugin, minimap);
       SteerableLockedView view = plugin.minimapListener().openFullscreen(fullscreenMinimap);
 

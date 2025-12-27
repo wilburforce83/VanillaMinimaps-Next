@@ -13,8 +13,8 @@ Updates:
 - README.MD supported version line
 
 Checks (offline):
-- Ensures paper.jar exists in the repo root (unless --skip-paper-check)
-- Attempts to read the Minecraft version from paper.jar and compare to --mc
+- Ensures <minecraftVersion>.jar exists in the repo root (unless --skip-paper-check)
+- Attempts to read the Minecraft version from <minecraftVersion>.jar and compare to --mc
 EOF
 }
 
@@ -61,7 +61,7 @@ fi
 gradle_properties="$ROOT_DIR/gradle.properties"
 pack_mcmeta="$ROOT_DIR/resourcepack/pack.mcmeta"
 readme="$ROOT_DIR/README.MD"
-paper_jar="$ROOT_DIR/paper.jar"
+paper_jar="$ROOT_DIR/${mc_version}.jar"
 
 if [[ ! -f "$gradle_properties" ]]; then
   echo "Missing $gradle_properties" >&2
@@ -148,6 +148,7 @@ if [[ "$skip_paper_check" -eq 0 ]]; then
   fi
   python3 - "$paper_jar" "$mc_version" <<'PY'
 import json
+import os
 import re
 import sys
 import zipfile
@@ -182,7 +183,7 @@ with zipfile.ZipFile(jar_path) as zf:
             break
 
 if not version_value:
-    print("Warning: could not determine Paper MC version from paper.jar", file=sys.stderr)
+    print(f"Warning: could not determine Paper MC version from {os.path.basename(jar_path)}", file=sys.stderr)
     raise SystemExit(0)
 
 match = re.search(r"\d+\.\d+(?:\.\d+)?", version_value)
@@ -192,7 +193,7 @@ if not match:
 
 found = match.group(0)
 if found != expected:
-    raise SystemExit(f"paper.jar MC version is {found}, expected {expected}")
+    raise SystemExit(f"{os.path.basename(jar_path)} MC version is {found}, expected {expected}")
 PY
 fi
 
