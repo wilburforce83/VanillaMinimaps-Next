@@ -53,6 +53,8 @@ public class NMSSteerableLockedView implements SteerableLockedView {
   protected final ServerPlayer viewer;
   private final Location origin;
   private Consumer<Void> sneakCallback;
+  private volatile boolean allowSneakClose;
+  private boolean lastShiftState;
   private boolean active;
 
   protected byte convertAngle(float angle) {
@@ -102,6 +104,7 @@ public class NMSSteerableLockedView implements SteerableLockedView {
 
       int stateId = serverPlayer.inventoryMenu.incrementStateId();
       connection.send(new ClientboundContainerSetContentPacket(0, stateId, EMPTY_INVENTORY, ItemStack.EMPTY), null);
+      allowSneakClose = true;
     }, 7L);
 
     active = true;
@@ -148,11 +151,11 @@ public class NMSSteerableLockedView implements SteerableLockedView {
             }
 
             if (msg instanceof ServerboundPlayerInputPacket packet) {
-              if (packet.input().shift()) {
-                if (sneakCallback != null) {
-                  sneakCallback.accept(null);
-                }
+              boolean shiftPressed = packet.input().shift();
+              if (allowSneakClose && shiftPressed && !lastShiftState && sneakCallback != null) {
+                sneakCallback.accept(null);
               }
+              lastShiftState = shiftPressed;
               return;
             }
 

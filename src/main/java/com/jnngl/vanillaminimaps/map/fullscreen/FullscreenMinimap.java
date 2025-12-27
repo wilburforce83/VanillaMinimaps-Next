@@ -31,10 +31,11 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -59,6 +60,7 @@ public class FullscreenMinimap {
   private final int width;
   private final int height;
   private double transitionState;
+  private BukkitTask renderTask;
 
   private static double easeOutCubic(double x) {
     return 1 - Math.pow(1 - x, 3);
@@ -125,16 +127,34 @@ public class FullscreenMinimap {
 
     fadeIn(provider, FullscreenMinimap::easeOutCubic, 20);
 
-    ExecutorService executor = Executors.newFixedThreadPool(4);
+    if (renderTask != null) {
+      renderTask.cancel();
+      renderTask = null;
+    }
 
-    Map.Entry<FullscreenMinimapLayer, Integer> entry;
-    while ((entry = chunkQueue.poll()) != null) {
-      FullscreenMinimapLayer layer = entry.getKey();
-      executor.execute(() -> {
+    renderTask = new BukkitRunnable() {
+      @Override
+      public void run() {
+        if (!holder.isOnline()) {
+          cancel();
+          renderTask = null;
+          return;
+        }
+
+        Map.Entry<FullscreenMinimapLayer, Integer> entry = chunkQueue.poll();
+        if (entry == null) {
+          cancel();
+          renderTask = null;
+          return;
+        }
+
+        FullscreenMinimapLayer layer = entry.getKey();
         byte[] data = new byte[128 * 128];
         MinimapLayerRenderer renderer = layer.base().renderer();
+        int baseX = layer.chunkX() << 7;
+        int baseZ = layer.chunkZ() << 7;
         if (renderer instanceof WorldMinimapRenderer worldRenderer) {
-          worldRenderer.renderFully(world, layer.chunkX() << 7, layer.chunkZ() << 7, data);
+          worldRenderer.renderFully(world, baseX, baseZ, data);
         } else {
           renderer.render(baseMinimap, layer.base(), data);
         }
@@ -159,13 +179,15 @@ public class FullscreenMinimap {
 
         FullscreenMapEncoder.encodePrimaryLayer(FullscreenMinimap.this, layer, buffer);
         provider.packetSender().updateLayer(holder, layer.base(), 0, 0, 128, 128, buffer);
-      });
-    }
-
-    executor.shutdown();
+      }
+    }.runTaskTimer(VanillaMinimaps.get(), 1L, 1L);
   }
 
   public void despawn(MinimapProvider provider, Consumer<Void> callback) {
+    if (renderTask != null) {
+      renderTask.cancel();
+      renderTask = null;
+    }
     fadeOut(provider, FullscreenMinimap::easeOutCubic, 10).whenComplete((v, t) -> {
       provider.packetSender().despawnLayer(holder, backgroundLayer);
       primaryLayer.forEach(layer -> provider.packetSender().despawnLayer(holder, layer.base()));
